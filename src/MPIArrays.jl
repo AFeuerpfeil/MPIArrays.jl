@@ -2,13 +2,13 @@
 Arrays with fixed size and MPI-safe indexing. This vector type is not meant for allocations in hot loops, but rather a convenience wrapper to use MPI on code without having to rewrite all array accesses. Examples for applications are distributed tensor networks.
 To make sure no errors arrise, it is crucial that all distributed operations like Base.setindex! or operations that change the size of the Array are performed on all ranks.
 
-The design of this package is inspired by ["CircularArrays.jl"].
+The design of this package is inspired by [CircularArrays.jl](https://github.com/Vexatos/CircularArrays.jl).
 """
 module MPIArrays
 
 export MPIArray, MPIVector, MPIMatrix
 
-using MPI, MPIHelper
+using MPI
 
 """
     MPIArray{T, N, A} <: AbstractArray{T, N}
@@ -55,25 +55,15 @@ Base.@propagate_inbounds Base.getindex(arr::MPIArray{T,N,A}, I::Vararg{Int,N}) w
 
 Base.@propagate_inbounds function Base.setindex!(arr::MPIArray, v, i::Int)
     if MPI.Initialized()
-        comm_world = MPI.COMM_WORLD
-        if MPI.Comm_rank(comm_world) == 0
-            setindex!(arr.data, v, i)
-        end
-        return arr.data[i] = large_bcast(arr.data[i], comm_world; root=0)
-    else
-        return setindex!(arr.data, v, i)
+        v = MPI.bcast(v, MPI.COMM_WORLD; root=0)
     end
+    setindex!(arr.data, v, i)
 end
 Base.@propagate_inbounds function Base.setindex!(arr::MPIArray{T,N,A}, v, I::Vararg{Int,N}) where {T,N,A}
     if MPI.Initialized()
-        comm_world = MPI.COMM_WORLD
-        if MPI.Comm_rank(comm_world) == 0
-            setindex!(arr.data, v, I...)
-        end
-        return arr.data[I...] = large_bcast(arr.data[I...], comm_world; root=0)
-    else
-        return setindex!(arr.data, v, I...)
+        v = MPI.bcast(v, MPI.COMM_WORLD; root=0)
     end
+    setindex!(arr.data, v, I...)
 end
 
 @inline Base.size(arr::MPIArray) = size(arr.data)
@@ -85,11 +75,7 @@ end
 @inline Base.in(x, arr::MPIArray) = in(x, parent(arr))
 @inline Base.copy(arr::MPIArray) = MPIArray(copy(parent(arr)))
 
-@inline function Base.checkbounds(arr::MPIArray, I...)
-    J = Base.to_indices(arr, I)
-    length(J) == 1 || length(J) >= ndims(arr) || throw(BoundsError(arr, I))
-    nothing
-end
+@inline Base.checkbounds(arr::MPIArray, I...) = checkbounds(parent(arr), I...)
 
 @inline _similar(arr::MPIArray, ::Type{T}, dims) where T = MPIArray(similar(parent(arr), T, dims))
 @inline Base.similar(arr::MPIArray, ::Type{T}, dims::Tuple{Base.DimOrInd, Vararg{Base.DimOrInd}}) where T = _similar(arr, T, dims)
@@ -143,8 +129,21 @@ MPIMatrix(def::T, size::NTuple{2, Integer}) where T = MPIMatrix{T}(fill(def, siz
 
 Base.empty(::MPIVector{T}, ::Type{U}=T) where {T,U} = MPIVector{U}(U[])
 Base.empty!(a::MPIVector) = (empty!(parent(a)); a)
-Base.push!(a::MPIVector, x...) = (push!(parent(a), x...); a)    ## TODO: Maybe write a bcast version, when x is only on the root?
-Base.append!(a::MPIVector, items) = (append!(parent(a), items); a)
+function Base.push!(a::MPIVector, x...)
+    if MPI.Initialized()
+        x = MPI.bcast(x, MPI.COMM_WORLD; root=0)
+    end
+    push!(parent(a), x...)
+    a
+end
+function Base.append!(a::MPIVector, items)
+    if MPI.Initialized()
+        # Broadcast the whole collection of items from root to all ranks.
+        items = MPI.bcast(items, MPI.COMM_WORLD; root=0)
+    end
+    append!(parent(a), items)
+    a
+end
 Base.resize!(a::MPIVector, nl::Integer) = (resize!(parent(a), nl); a)
 Base.pop!(a::MPIVector) = pop!(parent(a))
 Base.sizehint!(a::MPIVector, sz::Integer) = (sizehint!(parent(a), sz); a)
@@ -159,7 +158,10 @@ function Base.deleteat!(a::MPIVector, inds)
     a
 end
 
-function Base.insert!(a::MPIVector, i::Integer, item) ## TODO: Maybe write a bcast version, when x is only on the root?
+function Base.insert!(a::MPIVector, i::Integer, item)
+    if MPI.Initialized()
+        item = MPI.bcast(item, MPI.COMM_WORLD; root=0)
+    end
     insert!(a.data, i, item)
     a
 end

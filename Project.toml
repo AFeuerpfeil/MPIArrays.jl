@@ -1,7 +1,7 @@
 name = "MPIArrays"
 uuid = "c63b6952-658b-40a1-840c-e84f6adc5553"
 version = "1.0.0"
-authors = ["Andreas Feuerpfeil <andreas.feuerpfeil@gmail.com>"]
+authors = ["Andreas Feuerpfeil"]
 
 [deps]
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
