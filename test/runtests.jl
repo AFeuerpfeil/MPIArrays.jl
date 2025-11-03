@@ -92,6 +92,14 @@ end
         @test a[1] == ref
     end
 
+    @testset "nested MPIArray (2)" begin
+        a = MPIArray([MPIArray(rand(ComplexF64, 4)) for _ in 1:3])
+        b = rand(ComplexF64)
+        ref = MPI.bcast(rank == 0 ? b : nothing, comm; root=0)
+        a[1][1] = b
+        @test a[1][1] == ref
+    end
+
 end
 
 
