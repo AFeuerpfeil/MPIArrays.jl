@@ -8,6 +8,8 @@ module MPIArrays
 
 export MPIArray, MPIVector, MPIMatrix
 
+using MPI, MPIHelper
+
 """
     MPIArray{T, N, A} <: AbstractArray{T, N}
 `N`-dimensional array backed by an `AbstractArray{T, N}` of type `A` with fixed size and MPI-safe indexing.
