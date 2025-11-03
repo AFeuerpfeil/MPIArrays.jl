@@ -1,0 +1,13 @@
+name = "MPIArrays"
+uuid = "c63b6952-658b-40a1-840c-e84f6adc5553"
+authors = ["Andreas Feuerpfeil |andreas.feuerpfeil@uni-wuerzburg.de>"]
+version = "1.0.0-DEV"
+
+[compat]
+julia = "1.6.7"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
